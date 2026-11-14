@@ -67,6 +67,12 @@
         min-height: 1.5rem;
         color: #b91c1c;
       }
+
+      #filtros {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
     </style>
   </head>
   <body>
@@ -78,6 +84,11 @@
         <button type="submit">Agregar</button>
       </form>
       <p id="mensaje" role="status" aria-live="polite"></p>
+      <nav id="filtros" aria-label="Filtrar tareas">
+        <button type="button" data-estado="todas" aria-pressed="true">Todas</button>
+        <button type="button" data-estado="pendientes" aria-pressed="false">Pendientes</button>
+        <button type="button" data-estado="completadas" aria-pressed="false">Completadas</button>
+      </nav>
       <ul id="tareas">
         {% for tarea in tareas %}
         <li data-id="{{ tarea.id }}" class="{% if tarea.completada %}completada{% endif %}">
@@ -97,6 +108,8 @@
       const campoTitulo = document.getElementById("titulo");
       const listaTareas = document.getElementById("tareas");
       const mensaje = document.getElementById("mensaje");
+      const botonesFiltro = document.querySelectorAll("#filtros button");
+      let estadoActual = "todas";
 
       function mostrarMensaje(texto) {
         mensaje.textContent = texto;
@@ -126,11 +139,28 @@
       }
 
       async function cargarTareas() {
-        const respuesta = await fetch("/api/tareas");
+        const consulta = estadoActual === "todas" ? "" : `?estado=${estadoActual}`;
+        const respuesta = await fetch(`/api/tareas${consulta}`);
         if (!respuesta.ok) throw new Error("No se pudieron cargar las tareas.");
         const tareas = await respuesta.json();
         listaTareas.replaceChildren(...tareas.map(crearElementoTarea));
       }
+
+      botonesFiltro.forEach((boton) => {
+        boton.addEventListener("click", async () => {
+          estadoActual = boton.dataset.estado;
+          botonesFiltro.forEach((opcion) => {
+            opcion.setAttribute("aria-pressed", String(opcion === boton));
+          });
+          mostrarMensaje("");
+
+          try {
+            await cargarTareas();
+          } catch {
+            mostrarMensaje("No se pudieron cargar las tareas.");
+          }
+        });
+      });
 
       formulario.addEventListener("submit", async (evento) => {
         evento.preventDefault();
@@ -148,7 +178,9 @@
           }
 
           const tarea = await respuesta.json();
-          listaTareas.append(crearElementoTarea(tarea));
+          if (estadoActual !== "completadas") {
+            listaTareas.append(crearElementoTarea(tarea));
+          }
           formulario.reset();
           campoTitulo.focus();
         } catch {

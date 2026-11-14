@@ -30,8 +30,10 @@ def crear_tarea(datos: CrearTarea) -> servicios.Tarea:
 
 
 @app.get("/api/tareas")
-def listar_tareas() -> list[servicios.Tarea]:
-    return servicios.listar_tareas()
+def listar_tareas(
+    estado: servicios.EstadoTareas | None = None,
+) -> list[servicios.Tarea]:
+    return servicios.listar_tareas(estado)
 
 
 @app.put("/api/tareas/{id_tarea}/completar")

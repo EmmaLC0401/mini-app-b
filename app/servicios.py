@@ -1,4 +1,6 @@
-from typing import TypedDict
+from typing import Literal, TypedDict
+
+EstadoTareas = Literal["pendientes", "completadas"]
 
 
 class Tarea(TypedDict):
@@ -11,8 +13,13 @@ _tareas: list[Tarea] = []
 _siguiente_id = 1
 
 
-def listar_tareas() -> list[Tarea]:
-    return [tarea.copy() for tarea in _tareas]
+def listar_tareas(estado: EstadoTareas | None = None) -> list[Tarea]:
+    return [
+        tarea.copy()
+        for tarea in _tareas
+        if estado is None
+        or tarea["completada"] == (estado == "completadas")
+    ]
 
 
 def crear_tarea(titulo: str) -> Tarea:
