@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lista de tareas</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+        color: #1f2937;
+        background: #f3f4f6;
+      }
+
+      body {
+        max-width: 42rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+      }
+
+      main {
+        padding: 2rem;
+        border-radius: 1rem;
+        background: white;
+        box-shadow: 0 0.5rem 1.5rem #00000012;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      form {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      input {
+        flex: 1;
+        min-width: 0;
+        padding: 0.7rem;
+      }
+
+      button {
+        padding: 0.65rem 0.9rem;
+        cursor: pointer;
+      }
+
+      li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      li span {
+        flex: 1;
+        overflow-wrap: anywhere;
+      }
+
+      li.completada span {
+        color: #6b7280;
+        text-decoration: line-through;
+      }
+
+      #mensaje {
+        min-height: 1.5rem;
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Lista de tareas</h1>
+      <form id="formulario">
+        <label for="titulo">Nueva tarea</label>
+        <input id="titulo" name="titulo" required minlength="1" maxlength="100">
+        <button type="submit">Agregar</button>
+      </form>
+      <p id="mensaje" role="status" aria-live="polite"></p>
+      <ul id="tareas">
+        {% for tarea in tareas %}
+        <li data-id="{{ tarea.id }}" class="{% if tarea.completada %}completada{% endif %}">
+          <span>{{ tarea.titulo }}</span>
+          {% if tarea.completada %}
+          <button type="button" data-accion="completar" disabled>Completada</button>
+          {% else %}
+          <button type="button" data-accion="completar">Completar</button>
+          {% endif %}
+          <button type="button" data-accion="eliminar">Eliminar</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </main>
+    <script>
+      const formulario = document.getElementById("formulario");
+      const campoTitulo = document.getElementById("titulo");
+      const listaTareas = document.getElementById("tareas");
+      const mensaje = document.getElementById("mensaje");
+
+      function mostrarMensaje(texto) {
+        mensaje.textContent = texto;
+      }
+
+      function crearElementoTarea(tarea) {
+        const elemento = document.createElement("li");
+        elemento.dataset.id = tarea.id;
+        if (tarea.completada) elemento.classList.add("completada");
+
+        const titulo = document.createElement("span");
+        titulo.textContent = tarea.titulo;
+
+        const botonCompletar = document.createElement("button");
+        botonCompletar.type = "button";
+        botonCompletar.dataset.accion = "completar";
+        botonCompletar.textContent = tarea.completada ? "Completada" : "Completar";
+        botonCompletar.disabled = tarea.completada;
+
+        const botonEliminar = document.createElement("button");
+        botonEliminar.type = "button";
+        botonEliminar.dataset.accion = "eliminar";
+        botonEliminar.textContent = "Eliminar";
+
+        elemento.append(titulo, botonCompletar, botonEliminar);
+        return elemento;
+      }
+
+      async function cargarTareas() {
+        const respuesta = await fetch("/api/tareas");
+        if (!respuesta.ok) throw new Error("No se pudieron cargar las tareas.");
+        const tareas = await respuesta.json();
+        listaTareas.replaceChildren(...tareas.map(crearElementoTarea));
+      }
+
+      formulario.addEventListener("submit", async (evento) => {
+        evento.preventDefault();
+        mostrarMensaje("");
+
+        try {
+          const respuesta = await fetch("/api/tareas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ titulo: campoTitulo.value.trim() }),
+          });
+          if (!respuesta.ok) {
+            mostrarMensaje("El título debe tener entre 1 y 100 caracteres.");
+            return;
+          }
+
+          const tarea = await respuesta.json();
+          listaTareas.append(crearElementoTarea(tarea));
+          formulario.reset();
+          campoTitulo.focus();
+        } catch {
+          mostrarMensaje("No se pudo conectar con el servidor.");
+        }
+      });
+
+      listaTareas.addEventListener("click", async (evento) => {
+        const boton = evento.target.closest("button[data-accion]");
+        if (!boton) return;
+
+        const elemento = boton.closest("li[data-id]");
+        const id = elemento.dataset.id;
+        const accion = boton.dataset.accion;
+        mostrarMensaje("");
+
+        try {
+          const respuesta = await fetch(
+            accion === "completar"
+              ? `/api/tareas/${id}/completar`
+              : `/api/tareas/${id}`,
+            { method: accion === "completar" ? "PUT" : "DELETE" },
+          );
+          if (!respuesta.ok) {
+            mostrarMensaje("No se pudo actualizar la tarea.");
+            return;
+          }
+          await cargarTareas();
+        } catch {
+          mostrarMensaje("No se pudo conectar con el servidor.");
+        }
+      });
+    </script>
+  </body>
+</html>
